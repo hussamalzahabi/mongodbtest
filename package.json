@@ -4,21 +4,25 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start":"node server/server.js",
+    "start": "node server/server.js",
     "test": "export NODE_ENV=test || SET \"NODE_ENV=test\" && mocha server/**/*.test.js",
-    "watchtest":"nodemon --exec \"npm test\" "
+    "watchtest": "nodemon --exec \"npm test\" "
   },
   "engines": {
-    "node":"9.3.0"
+    "node": "9.3.0"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "body-parser": "1.15.2",
     "express": "4.14.0",
+    "lodash": "^4.15.0",
     "mongodb": "2.2.34",
     "mongoose": "4.5.9",
-    "lodash": "4.15.0"
+    "validator": "^9.4.1",
+    "crypto-js": "^3.1.9-1",
+    "jsonwebtoken": "^8.1.1",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "expect": "^1.20.2",

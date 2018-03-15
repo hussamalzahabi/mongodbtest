@@ -3,26 +3,28 @@ const request = require("supertest");
 const {ObjectId} = require("mongodb")
 
 const {app} = require("../server");
-const {users , users2} = require("../model/Users");
-const {userBody,userBody2 ,userFunc, userFunc2} = require("./../../seeds/seed")
+const {users} = require("../model/Users");
+const {todo} = require("../model/todo");
+const {userBody,todoBody ,userFunc, todoFunc} = require("./../../seeds/seed")
 
 
 beforeEach(userFunc)
-beforeEach(userFunc2)
+beforeEach(todoFunc)
 
 
-describe("POST /adduser", () => {
+describe("POST /todo", () => {
 
     it("Should be add users correctly !!", (done) => {
 
-        var txt = "ahmed";
+        var text = "ahmed";
 
         request(app)
-            .post("/adduser")
-            .send({name: txt})
+            .post("/todo")
+            .set("x-auth",userBody[1].tokens[0].token)
+            .send({text})
             .expect(200)
             .expect((req) => {
-                expect(req.body.name).toBe(txt)
+                expect(req.body.text).toBe(text)
             })
             .end((err, res) => {
                 if (err) {
@@ -30,10 +32,10 @@ describe("POST /adduser", () => {
                 }
 
 
-                users.find({name: txt}).then((res) => {
+                todo.find({text}).then((res) => {
 
                     expect(res.length).toBe(1);
-                    expect(res[0].name).toBe(txt);
+                    expect(res[0].text).toBe(text);
 
                     done();
 
@@ -45,11 +47,12 @@ describe("POST /adduser", () => {
 
     it("Should be throw an error", (done) => {
 
-        var txt = "";
+        var text = "";
 
         request(app)
-            .post("/adduser")
-            .send({name: null})
+            .post("/todo")
+            .set("x-auth",userBody[1].tokens[0].token)
+            .send({text: null})
             .expect(400)
             .end((err, res) => {
                 if (err) {
@@ -57,7 +60,7 @@ describe("POST /adduser", () => {
                 }
 
 
-                users.find().then((res) => {
+                todo.find().then((res) => {
 
                     expect(res.length).toBe(2);
 
@@ -72,15 +75,16 @@ describe("POST /adduser", () => {
 
 });
 
-describe('GET /showuser', () => {
+describe('GET /todo', () => {
 
     it("Should be contain 2 arrays", (done) => {
 
         request(app)
-            .get("/showuser")
+            .get("/todo")
+            .set("x-auth",userBody[1].tokens[0].token)
             .expect(200)
             .expect((res) => {
-                expect(res.body.result.length).toBe(2);
+                expect(res.body.result.length).toBe(1);
             })
             .end(done)
 
@@ -89,19 +93,27 @@ describe('GET /showuser', () => {
 
 });
 
-describe("GET /showuser/:id", () => {
-
-    var id = new ObjectId().toHexString();
-
+describe("GET /todo/:id", () => {
 
     it("should be return 200 status back and the name match with own id", (done) => {
 
         request(app)
-            .get(`/showuser/${userBody[1]._id.toHexString()}`)
+            .get(`/todo/${todoBody[1]._id.toHexString()}`)
+            .set("x-auth",userBody[1].tokens[0].token)
             .expect(200)
             .expect((response) => {
-                expect(response.body.name).toBe(userBody[1].name)
+                expect(response.body.name).toBe(todoBody[1].name)
             })
+            .end(done)
+
+    })
+
+    it("should be not return 404 status back which indicate that a user dosen't permitted to fetch todo", (done) => {
+
+        request(app)
+            .get(`/todo/${todoBody[1]._id.toHexString()}`)
+            .set("x-auth",userBody[0].tokens[0].token)
+            .expect(404)
             .end(done)
 
     })
@@ -109,7 +121,8 @@ describe("GET /showuser/:id", () => {
     it("should be return 404 back which indicates that the id is not exists", (done) => {
 
         request(app)
-            .get(`/showuser/${id}`)
+            .get(`/todo/${new ObjectId().toHexString()}`)
+            .set("x-auth",userBody[0].tokens[0].token)
             .expect(404)
             .end(done)
 
@@ -118,7 +131,8 @@ describe("GET /showuser/:id", () => {
     it("should be return 404 back which indicates that the id is not valid", (done) => {
 
         request(app)
-            .get(`/showuser/${id + "d"}`)
+            .get(`/todo/${new ObjectId().toHexString() + "d"}`)
+            .set("x-auth",userBody[0].tokens[0].token)
             .expect(404)
             .end(done)
     })
@@ -127,16 +141,17 @@ describe("GET /showuser/:id", () => {
 })
 
 
-describe("DELETE /user/:id", () => {
+describe("DELETE /todo/:id", () => {
 
     let id = new ObjectId().toHexString();
     it("Should be delete the specific id and return 200", (done) => {
 
         request(app)
-            .delete(`/user/${userBody[1]._id}`)
+            .delete(`/todo/${todoBody[1]._id}`)
+            .set("x-auth",userBody[1].tokens[0].token)
             .expect(200)
             .expect((response) => {
-                expect(response.body.result._id).toBe(userBody[1]._id.toHexString())
+                expect(response.body.result._id).toBe(todoBody[1]._id.toHexString())
             })
             .end((err, res) => {
 
@@ -144,7 +159,7 @@ describe("DELETE /user/:id", () => {
                     return done(err)
                 }
 
-                users.findById(userBody[1]._id).then((result)=>{
+                todo.findById(todoBody[1]._id).then((result)=>{
 
 
                     expect(result).toNotExist();
@@ -157,11 +172,36 @@ describe("DELETE /user/:id", () => {
 
     });
 
+    it("Should not be delete the specific id and return 200", (done) => {
+
+        request(app)
+            .delete(`/todo/${todoBody[1]._id}`)
+            .set("x-auth",userBody[0].tokens[0].token)
+            .expect(404)
+            .end((err, res) => {
+
+                if (err) {
+                    return done(err)
+                }
+
+                todo.findById(todoBody[1]._id).then((result)=>{
+
+
+                    expect(result).toExist();
+                    done();
+
+                },(error)=>done(error));
+
+
+            });
+
+    });
 
     it("Should be send 404 back , because the specific id is not found", (done) => {
 
         request(app)
-            .delete(`/user/${id}`)
+            .delete(`/todo/${id}`)
+            .set("x-auth",userBody[1].tokens[0].token)
             .expect(404)
             .expect((response)=>{
                 expect(response.body.reason).toBe("The id which you specified is not found !!")
@@ -174,7 +214,8 @@ describe("DELETE /user/:id", () => {
     it("Should be send 404 back , because the specific id is not valid", (done) => {
 
         request(app)
-            .delete(`/user/${id+"d"}`)
+            .delete(`/todo/${id+"d"}`)
+            .set("x-auth",userBody[1].tokens[0].token)
             .expect(404)
             .expect((response)=>{
                 expect(response.body.reason).toBe("Not valid id !!")
@@ -186,40 +227,55 @@ describe("DELETE /user/:id", () => {
 
 });
 
-describe("PATCH /user/:id",()=>{
+describe("PATCH /todo/:id",()=>{
 
     it("Should be to update as what it expected !!",(done)=>{
         //user 1
-        let id = userBody[0]._id;
+        let id = todoBody[1]._id;
 
         request.agent(app)
-            .patch(`/user/${id}`)
-            .send({name:"khalid",activated:true})
+            .patch(`/todo/${id}`)
+            .set("x-auth",userBody[1].tokens[0].token)
+            .send({text:"hello,world",completed:true})
             .expect(200)
             .expect((res)=>{
 
-                expect(res.body.result.name).toBe("khalid")
-                expect(res.body.result.activated).toBe(true)
-                expect(res.body.result.activatedAt).toBeA("number")
+                expect(res.body.result.text).toBe("hello,world")
+                expect(res.body.result.completed).toBe(true)
+                expect(res.body.result.completedAt).toBeA("number")
 
             })
             .end(done)
 
     })
 
+    it("Should not be to update as what it expected !!",(done)=>{
+        //user 1
+        let id = todoBody[1]._id;
+
+        request.agent(app)
+            .patch(`/todo/${id}`)
+            .set("x-auth",userBody[0].tokens[0].token)
+            .send({text:"hello,world",completed:true})
+            .expect(404)
+            .end(done)
+
+    })
+
     it("Should be to set activated time field to null !!",(done)=>{
         //user 2
-        let id = userBody[1]._id;
+        let id = todoBody[1]._id;
 
         request(app)
-            .patch(`/user/${id}`)
-            .send({name:"ramez",activated:false})
+            .patch(`/todo/${id}`)
+            .set("x-auth",userBody[1].tokens[0].token)
+            .send({text:"hello,world",completed:false})
             .expect(200)
             .expect((res)=>{
 
-                expect(res.body.result.name).toBe("ramez")
-                expect(res.body.result.activated).toBe(false)
-                expect(res.body.result.activatedAt).toNotExist();
+                expect(res.body.result.text).toBe("hello,world")
+                expect(res.body.result.completed).toBe(false)
+                expect(res.body.result.completedAt).toNotExist();
 
             })
             .end(done)
@@ -228,23 +284,23 @@ describe("PATCH /user/:id",()=>{
 
 })
 
-describe("GET users2/me/",()=>{
+describe("GET user/me/",()=>{
 
     it("Should be return an authenticate user",(done)=>{
         request(app)
-            .get("/user2/me/")
-            .set("x-auth",userBody2[0].tokens[0].token)
+            .get("/user/me/")
+            .set("x-auth",userBody[0].tokens[0].token)
             .expect(200)
             .expect((res)=>{
-                expect(res.body._id).toBe(userBody2[0]._id.toHexString())
-                expect(res.body.email).toBe(userBody2[0].email)
+                expect(res.body._id).toBe(userBody[0]._id.toHexString())
+                expect(res.body.email).toBe(userBody[0].email)
             })
             .end(done)
     });
 
     it("Should be return 401 in none authenticate user",(done)=>{
         request(app)
-            .get("/user2/me/")
+            .get("/user/me/")
             .expect(401)
             .expect((res)=>{
                 expect(res.body).toEqual({})
@@ -254,12 +310,12 @@ describe("GET users2/me/",()=>{
 
 })
 
-describe("POST user2/",()=>{
+describe("POST user/",()=>{
 
     it ("Should be create a user",(done)=>{
         var email = "hussam@hot.com", password = 12345678910;
         request(app)
-            .post("/user2/")
+            .post("/user/")
             .send({email,password})
             .expect(200)
             .expect((res)=>{
@@ -272,7 +328,7 @@ describe("POST user2/",()=>{
                 if(err)
                     done(err)
 
-                users2.findOne({
+                users.findOne({
                    email
                 }).then((result)=>{
                     expect(result.password).toNotBe(password)
@@ -285,16 +341,16 @@ describe("POST user2/",()=>{
     it("Should return validation error if request invalid",(done)=>{
         var email = "hussam.com", password = 34;
         request(app)
-            .post("/user2/")
+            .post("/user/")
             .send({email,password})
             .expect(400)
 
             .end(done)
     })
     it("Should not create a user if the email is already exist",(done)=>{
-        var email = userBody2[0].email , password = "dsadasdsadasdasda";
+        var email = userBody[0].email , password = "dsadasdsadasdasda";
         request(app)
-            .post("/user2/")
+            .post("/user/")
             .send({email,password})
             .expect(400)
             .end(done)
@@ -305,15 +361,15 @@ describe("POST user2/",()=>{
 
 })
 
-describe("POST users2/login",()=>{
+describe("POST user/login",()=>{
 
     it ("Should login user and return auth token",(done)=>{
         request(app)
-            .post("/user2/login")
-            .send(userBody2[1])
+            .post("/user/login")
+            .send(userBody[1])
             .expect(200)
             .expect((response)=>{
-                expect(response.header['x-auth']).toBeExist;
+                expect(response.header['x-auth']).toExist;
             })
             .end((err,result)=>{
 
@@ -321,16 +377,16 @@ describe("POST users2/login",()=>{
                     done(err)
                 }
 
-                users2.findById(userBody2[1]._id).then((res)=>{
-                    expect(res.tokens[0]).toInclude({access:"auth",token:result.header['x-auth']})
+                users.findById(userBody[1]._id).then((res)=>{
+                    expect(res.tokens[1]).toInclude({access:"auth",token:result.header['x-auth']})
                     done();
                 }).catch((e)=>done(e))
             })
     })
     it ("Should reject invalid login",(done)=>{
         request(app)
-            .post("/user2/login")
-            .send({email:userBody2[1].email+"dsd",password:userBody2[1].password})
+            .post("/user/login")
+            .send({email:userBody[1].email+"dsd",password:userBody[1].password})
             .expect(400)
             .expect((response)=>{
                 expect(response.header['x-auth']).toNotExist;
@@ -341,8 +397,8 @@ describe("POST users2/login",()=>{
                     done(err)
                 }
 
-                users2.findById(userBody2[1]._id).then((res)=>{
-                    expect(res.tokens.length).toBe(0)
+                users.findById(userBody[1]._id).then((res)=>{
+                    expect(res.tokens.length).toBe(1)
                     done();
                 })
             })
@@ -352,9 +408,9 @@ describe("POST users2/login",()=>{
 
 describe("DELETE /user2/login/me",()=>{
     it("Should be remove an auth token after logout",(done)=>{
-        let token = userBody2[0].tokens[0].token;
+        let token = userBody[0].tokens[0].token;
         request(app)
-            .delete("/user2/me/token")
+            .delete("/user/me/token")
             .set("x-auth",token)
             .expect(200)
             .end((err,response)=>{
@@ -362,7 +418,7 @@ describe("DELETE /user2/login/me",()=>{
                 if (err)
                     return done(err)
 
-                users2.findById(userBody2[0]._id).then((result)=>{
+                users.findById(userBody[0]._id).then((result)=>{
                     expect(result.tokens.length).toBe(0)
                     done();
                 }).catch((e)=>done(e))

@@ -1,14 +1,14 @@
-require("./../config/config")
+require("./../config/config");
 
-const express = require("express")
-const bodyParser = require("body-parser")
+const express = require("express");
+const bodyParser = require("body-parser");
 const _ = require("lodash");
-const bcrypt = require("bcryptjs")
-const {ObjectId} = require("mongodb")
-const {Mongoose} = require("./db/mongoose")
-const {users, users2} = require("./model/Users")
-const {Notes} = require("./model/Notes")
-const {authenticate} = require("./../MiddleWare/auth")
+const bcrypt = require("bcryptjs");
+const {ObjectId} = require("mongodb");
+const {Mongoose} = require("./db/mongoose");
+const {users} = require("./model/Users");
+const {todo} = require("./model/todo");
+const {authenticate} = require("./../MiddleWare/auth");
 
 
 var port = process.env.PORT;
@@ -17,14 +17,15 @@ var app = express();
 
 app.use(bodyParser.json());
 
-app.post("/adduser", (req, res) => {
+app.post("/todo", authenticate , (req, res) => {
 
-    var Users = new users({
-        name: req.body.name, age: req.body.age, occupation: req.body.occupation, activated: false,
-        activatedAt: new Date().getTime()
+    var body = req.body , id = req.user._id;
+    var Todo = new todo({
+        text: body.text,
+        _creator:id
     });
 
-    Users.save().then((result) => {
+    Todo.save().then((result) => {
         res.send(result)
     }, (err) => {
         res.status(400).send(err)
@@ -32,9 +33,9 @@ app.post("/adduser", (req, res) => {
 
 })
 
-app.get("/showuser", (req, res) => {
+app.get("/todo", authenticate,  (req, res) => {
 
-    users.find().then((result) => {
+    todo.find({_creator:req.user._id}).then((result) => {
 
         res.send({result})
 
@@ -43,29 +44,30 @@ app.get("/showuser", (req, res) => {
 
 });
 
-app.get("/showuser/:id", (req, res) => {
+app.get("/todo/:id", authenticate , (req, res) => {
 
-    var id = req.params.id;
+    let id = req.params.id;
     if (!ObjectId.isValid(id)) {
         res.status(404).send({});
     }
 
 
-    users.findById(id).then((results) => {
+    todo.findOne({_id:id,_creator:req.user._id}).then((results) => {
 
         if (results) {
             res.send(results)
         }
-        else {
+        else
+            {
             res.status(404).send({});
         }
 
-    }).catch(e => res.status(400))
+    }).catch((e) => res.status(400))
 
 
 });
 
-app.delete("/user/:id", (req, res) => {
+app.delete("/todo/:id", authenticate , (req, res) => {
 
     var id = req.params.id;
 
@@ -73,7 +75,7 @@ app.delete("/user/:id", (req, res) => {
         return res.status(404).send({"reason": "Not valid id !!"});
     }
 
-    users.findByIdAndRemove(id).then((result) => {
+    todo.findOneAndRemove({_id:id,_creator:req.user._id}).then((result) => {
 
         if (result)
             res.send({result})
@@ -86,22 +88,22 @@ app.delete("/user/:id", (req, res) => {
 
 });
 
-app.patch("/user/:id", (req, res) => {
+app.patch("/todo/:id", authenticate , (req, res) => {
 
     var id = req.params.id;
-    var body = _.pick(req.body, ['name', 'age', 'occupation', 'activated'])
+    var body = _.pick(req.body, ['text', 'completed'])
     if (!ObjectId.isValid(id)) {
         return res.status(404).send({"reason": "Not valid id !!"});
     }
 
-    if (_.isBoolean(body.activated) && body.activated) {
-        body.activatedAt = new Date().getTime();
+    if (_.isBoolean(body.completed) && body.completed) {
+        body.completedAt = new Date().getTime();
     }
     else {
-        body.activated = false;
-        body.activatedAt = null;
+        body.completed = false;
+        body.completedAt = null;
     }
-    users.findByIdAndUpdate(id, {$set: body}, {new: true}).then((result) => {
+    todo.findOneAndUpdate({_id:id,_creator:req.user._id}, {$set: body}, {new: true}).then((result) => {
 
         if (result)
             res.send({result})
@@ -113,11 +115,11 @@ app.patch("/user/:id", (req, res) => {
 
 })
 
-app.post("/user2/", (req, res) => {
+app.post("/user/", (req, res) => {
 
     var body = _.pick(req.body, ["email", "password"]);
 
-    var user = new users2(body);
+    var user = new users(body);
 
     user.save().then((user) => {
 
@@ -131,18 +133,18 @@ app.post("/user2/", (req, res) => {
 });
 
 
-app.get("/user2/me", authenticate, (req, res) => {
+app.get("/user/me", authenticate, (req, res) => {
 
     res.send(req.user)
 
 });
 
-app.post("/user2/login", (req, response) => {
+app.post("/user/login", (req, response) => {
 
     let body = req.body;
     body = _.pick(body,["email","password"])
 
-    users2.findByCredential(body.email,body.password).then((result) => {
+    users.findByCredential(body.email,body.password).then((result) => {
 
         return result.generateAuthToken().then((token)=>{
             response.header("x-auth",token).send(result)
@@ -151,7 +153,7 @@ app.post("/user2/login", (req, response) => {
     }).catch((err)=>{response.status(400).send({err}) })
 })
 
-app.delete("/user2/me/token",authenticate,(req,res)=>{
+app.delete("/user/me/token",authenticate,(req,res)=>{
 
     let user = req.user , token = req.token;
 

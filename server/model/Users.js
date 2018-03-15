@@ -5,18 +5,10 @@ const jwt = require("jsonwebtoken")
 const bcrypt = require("bcryptjs")
 
 
-var users = Mongoose.model("Users", {
-
-    name: {type: String, required: true, minLength: 1, trim: true},
-    age: {type: Number, minLength: 1, trim: true},
-    occupation: {type: String, trim: true},
-    activated: {type: Boolean, trim: true},
-    activatedAt: {type: Number}
 
 
-})
 
-users2Schema = new Mongoose.Schema({
+userSchema = new Mongoose.Schema({
 
     email: {
         type: String,
@@ -51,19 +43,19 @@ users2Schema = new Mongoose.Schema({
 
 });
 
-users2Schema.methods.toJSON = function () {
+userSchema.methods.toJSON = function () {
     var user = this;
     user = user.toObject();
 
     return _.pick(user, ["email", "_id"])
 }
 
-users2Schema.methods.generateAuthToken = function () {
+userSchema.methods.generateAuthToken = function () {
     var user = this;
     var access = "auth";
     var data = {_id: user._id, access}
 
-    var token = jwt.sign(data, "abc123").toString();
+    var token = jwt.sign(data, process.env.JWT_SECRET).toString();
 
 
     user.tokens = user.tokens.concat([{token, access}]);
@@ -77,23 +69,23 @@ users2Schema.methods.generateAuthToken = function () {
 }
 
 
-users2Schema.methods.removeToken = function (token) {
+userSchema.methods.removeToken = function (token) {
 
     let user = this;
 
     return user.update({
-        $pull:{tokens:{token}}
-    }
-        )
+            $pull: {tokens: {token}}
+        }
+    )
 
 }
 
-users2Schema.statics.findByToken = function (token) {
+userSchema.statics.findByToken = function (token) {
     var User = this, decoded;
 
     try {
 
-        decoded = jwt.verify(token, "abc123");
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     } catch (err) {
         return Promise.reject();
@@ -107,7 +99,7 @@ users2Schema.statics.findByToken = function (token) {
 
 }
 
-users2Schema.statics.findByCredential = function (email, password) {
+userSchema.statics.findByCredential = function (email, password) {
 
     let User = this;
 
@@ -139,7 +131,7 @@ users2Schema.statics.findByCredential = function (email, password) {
 };
 
 
-users2Schema.pre("save", function (next) {
+userSchema.pre("save", function (next) {
     var user = this;
     if (user.isModified("password")) {
 
@@ -156,6 +148,6 @@ users2Schema.pre("save", function (next) {
         next();
     }
 })
-var users2 = Mongoose.model("users2", users2Schema);
+var users = Mongoose.model("users", userSchema);
 
-module.exports = {users, users2}
+module.exports = {users}
